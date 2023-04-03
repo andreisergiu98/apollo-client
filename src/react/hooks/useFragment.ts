@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { equal } from "@wry/equality";
 
 import { mergeDeepArray } from "../../utilities";
@@ -72,16 +72,16 @@ export function useFragment_experimental<
     optimistic,
   };
 
-  const resultRef = useRef<UseFragmentResult<TData>>();
-  let latestDiff = cache.diff<TData>(diffOptions);
+  const [initialData] = useState(() => {
+		return diffToResult(cache.diff<TData>(diffOptions));
+	});
+
+	const currentData = useRef<UseFragmentResult<TData>>();
+	const currentDiff = useRef<Cache.DiffResult<TData>>();
 
   // Used for both getSnapshot and getServerSnapshot
   const getSnapshot = () => {
-    const latestDiffToResult = diffToResult(latestDiff);
-    return resultRef.current &&
-      equal(resultRef.current.data, latestDiffToResult.data)
-      ? resultRef.current
-      : (resultRef.current = latestDiffToResult);
+    return currentData.current ?? initialData;
   };
 
   return useSyncExternalStore(
@@ -90,8 +90,9 @@ export function useFragment_experimental<
         ...diffOptions,
         immediate: true,
         callback(diff) {
-          if (!equal(diff, latestDiff)) {
-            resultRef.current = diffToResult((latestDiff = diff));
+          if (!equal(diff, currentDiff.current)) {
+            currentDiff.current = diff;
+						currentData.current = diffToResult(diff);
             forceUpdate();
           }
         },
